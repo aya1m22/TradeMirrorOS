@@ -2,28 +2,12 @@ import { storageService } from "@/services/storage/storageService";
 import { tradeService } from "./tradeService";
 import { documentService } from "./documentService";
 import { authService } from "@/features/auth/services/authService";
-import { devAutoLogin } from "@/config/env";
 import { generateTradeReference } from "@/core/domain/tradeReference";
 import { toTradeInsert, type MirroredContract } from "@/core/mirroring";
 
-/**
- * Return the current session, establishing the Phase-1 hardcoded admin session
- * on demand if none exists yet. This closes the window where Save is clicked
- * before the AuthProvider's auto-login has resolved (or after a transient loss):
- * the happy path (session already present) is unchanged; when no session and the
- * dev auto-login credentials are configured, it signs in once before proceeding.
- */
+/** Return the current Supabase session (null when signed out). */
 async function ensureSession() {
-  let session = await authService.getSession();
-  if (!session && devAutoLogin) {
-    try {
-      await authService.signIn(devAutoLogin.email, devAutoLogin.password);
-      session = await authService.getSession();
-    } catch {
-      // Fall through to the guard in persistGeneratedContract.
-    }
-  }
-  return session;
+  return authService.getSession();
 }
 
 /**
@@ -69,9 +53,8 @@ export async function persistGeneratedContract(args: {
   const session = await ensureSession();
   if (!session) {
     throw new Error(
-      "Saving to the Trade Folder needs an authenticated session. Phase 1 uses a hardcoded " +
-        "admin session via dev auto-login — run the app with `npm run dev`. Your PDF still " +
-        "previews and downloads.",
+      "Saving to the Trade Folder needs an authenticated session. Please sign in and try " +
+        "again — your PDF still previews and downloads.",
     );
   }
 
@@ -81,8 +64,9 @@ export async function persistGeneratedContract(args: {
   const reference = generateTradeReference(year, existing.length + 1);
   const contractDate = new Date().toISOString().slice(0, 10);
 
-  const uploaded = await storageService.uploadGeneratedContract(args.bytes, args.fileName);
-
+  // Multi-step write with compensation: trade row → storage object → document
+  // row. There is no cross-service transaction, so if a later step fails we undo
+  // the earlier ones (reverse order) to avoid orphaned files / dangling trades.
   const tradeInsert = toTradeInsert(args.mirrored, {
     ...DEFAULT_CONTEXT,
     ...args.context,
@@ -91,19 +75,34 @@ export async function persistGeneratedContract(args: {
   });
   const trade = await tradeService.create(tradeInsert);
 
-  const documentInsert = {
-    trade_id: trade.id,
-    document_type: "sales_contract" as const,
-    file_name: args.fileName,
-    storage_path: uploaded.path,
-    uploaded_by: session.user.id,
-  };
-  const document = await documentService.create(documentInsert);
+  let uploaded;
+  try {
+    uploaded = await storageService.uploadGeneratedContract(args.bytes, args.fileName);
+  } catch (e) {
+    // Roll back the trade row so a failed upload leaves nothing behind.
+    await tradeService.remove(trade.id).catch(() => {});
+    throw e;
+  }
 
-  return {
-    tradeId: trade.id,
-    documentId: document.id,
-    storagePath: uploaded.path,
-    tradeReference: reference,
-  };
+  try {
+    const document = await documentService.create({
+      trade_id: trade.id,
+      document_type: "sales_contract" as const,
+      file_name: args.fileName,
+      storage_path: uploaded.path,
+      uploaded_by: session.user.id,
+    });
+
+    return {
+      tradeId: trade.id,
+      documentId: document.id,
+      storagePath: uploaded.path,
+      tradeReference: reference,
+    };
+  } catch (e) {
+    // Roll back the storage object and the trade row (reverse order).
+    await storageService.remove(uploaded.path).catch(() => {});
+    await tradeService.remove(trade.id).catch(() => {});
+    throw e;
+  }
 }

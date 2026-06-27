@@ -225,6 +225,7 @@ export interface Database {
           bank_profile_id: string;
           client_id: string;
           contact_id: string;
+          partner_id: string | null;
           contract_date: string;
           signing_date: string | null;
           bol_date: string | null;
@@ -255,6 +256,7 @@ export interface Database {
           bank_profile_id: string;
           client_id: string;
           contact_id: string;
+          partner_id?: string | null;
           contract_date: string;
           signing_date?: string | null;
           bol_date?: string | null;
@@ -284,6 +286,7 @@ export interface Database {
           bank_profile_id?: string;
           client_id?: string;
           contact_id?: string;
+          partner_id?: string | null;
           contract_date?: string;
           signing_date?: string | null;
           bol_date?: string | null;
@@ -329,6 +332,12 @@ export interface Database {
             foreignKeyName: "trades_contact_id_fkey";
             columns: ["contact_id"];
             referencedRelation: "contacts";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "trades_partner_id_fkey";
+            columns: ["partner_id"];
+            referencedRelation: "users";
             referencedColumns: ["id"];
           },
         ];
@@ -377,7 +386,47 @@ export interface Database {
         ];
       };
     };
-    Views: Record<string, never>;
+    Views: {
+      // Role-masked, row-scoped read model over `trades` (see migration
+      // 20260628120000_delivery_hardening.sql). Financial columns are NULL for
+      // non-super-admins; Partners only see rows assigned to them. Read-only.
+      v_trades: {
+        Row: {
+          id: string;
+          trade_reference: string;
+          entity_id: string;
+          bank_profile_id: string;
+          client_id: string;
+          contact_id: string;
+          partner_id: string | null;
+          contract_date: string;
+          signing_date: string | null;
+          bol_date: string | null;
+          frigo_contract_ref: string;
+          quantity_tons: number;
+          product_description: string;
+          frigo_unit_price: number | null;
+          frigo_total: number | null;
+          sale_unit_price: number | null;
+          sale_total: number | null;
+          shipping_cost: number | null;
+          insurance_cost: number | null;
+          bank_fees: number | null;
+          total_costs: number | null;
+          net_profit: number | null;
+          advance_status: MilestoneStatus;
+          advance_received_at: string | null;
+          balance_status: MilestoneStatus;
+          balance_received_at: string | null;
+          trade_status: TradeStatus;
+          created_at: string;
+          updated_at: string;
+          client_company_name: string | null;
+          entity_name: string | null;
+        };
+        Relationships: [];
+      };
+    };
     Functions: Record<string, never>;
     Enums: {
       user_role: UserRole;

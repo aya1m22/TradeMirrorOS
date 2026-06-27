@@ -16,3 +16,9 @@ dist-ssr
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Supabase CLI scratch
+**/.temp/
+
+# TS incremental build cache
+*.tsbuildinfo

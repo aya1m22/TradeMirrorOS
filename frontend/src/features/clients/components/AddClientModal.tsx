@@ -96,6 +96,16 @@ export function AddClientModal({
       setError("Please fill in all required fields.");
       return;
     }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(form.contact_email.trim())) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+    const phoneRegex = /^\+?[0-9\s\-()]{7,20}$/;
+    if (!phoneRegex.test(form.contact_phone.trim())) {
+      setError("Please enter a valid phone number (e.g., +1 234 567 8901).");
+      return;
+    }
     setSaving(true);
     setError("");
     const payload = { ...form, notes: form.notes.trim() || null };

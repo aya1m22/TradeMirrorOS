@@ -1,0 +1,12 @@
+# Supabase project config — used by the Supabase CLI for deploys.
+# Project ref matches frontend/.env VITE_SUPABASE_PROJECT_ID (xwvdktfhfadlwoqjkqcb).
+project_id = "xwvdktfhfadlwoqjkqcb"
+
+[functions.invite-user]
+# Privileged invite flow (PRD §2.2/§2.4). Uses the service-role key, so it must
+# run server-side. verify_jwt = true: the function authorizes the caller itself
+# (must be an active super_admin), so an authenticated JWT is required.
+verify_jwt = true
+
+[functions.milestone-alerts]
+verify_jwt = true

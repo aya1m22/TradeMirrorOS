@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Button, Input, Modal, Select, Spinner } from "@/components/ui";
-import { userService } from "@/features/users/services/userService";
+import { userService, type InviteResult } from "@/features/users/services/userService";
 import type { UserRole } from "@/services/supabase";
 
 const ROLES: { value: UserRole; label: string }[] = [
@@ -21,7 +21,9 @@ export function InviteUserModal({
 }: {
   open: boolean;
   onClose: () => void;
-  onInvited: () => void;
+  /** Called after the account is created. `emailWarning`/`inviteLink` are set when
+   *  the user was created but the invite email couldn't be sent (not a failure). */
+  onInvited: (result: InviteResult) => void;
 }) {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -46,14 +48,22 @@ export function InviteUserModal({
     setSaving(true);
     setError("");
     try {
-      await userService.invite({ full_name: fullName.trim(), email: email.trim(), role });
-      onInvited();
+      const result = await userService.invite({
+        full_name: fullName.trim(),
+        email: email.trim(),
+        role,
+      });
+      onInvited(result);
     } catch (e) {
-      setError(
-        e instanceof Error
-          ? `Couldn't send the invite: ${e.message}`
-          : "Couldn't send the invite. The invite-user Edge Function and its secrets (service-role + Resend) must be configured.",
-      );
+      let msg: string;
+      if (e instanceof Error && e.message.includes("Failed to send a request to the Edge Function")) {
+        // Network/CORS or the function isn't reachable (not deployed).
+        msg = "Couldn't reach the invite-user Edge Function. Confirm it's deployed and reachable.";
+      } else {
+        // Real reason surfaced from the function's JSON body by userService.
+        msg = `Couldn't send the invite: ${e instanceof Error ? e.message : "Unknown error."}`;
+      }
+      setError(msg);
     } finally {
       setSaving(false);
     }

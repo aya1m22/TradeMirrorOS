@@ -638,8 +638,9 @@ function NumberField({
       <input
         type="number"
         step="0.01"
+        min="0"
         value={Number.isFinite(value) ? value : 0}
-        onChange={(e) => onChange(Number(e.target.value) || 0)}
+        onChange={(e) => onChange(Math.max(0, Number(e.target.value) || 0))}
         className={cn(
           "h-9 w-full rounded border bg-surface px-3 font-mono text-sm text-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40",
           invalid ? "border-danger" : "border-border hover:border-ink-300",

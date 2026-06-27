@@ -83,9 +83,8 @@ export function PartnerDashboard() {
 
         {!isLoading && !isError && (
           <>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <Metric label="Total trades" value={String(portfolio.totalTrades)} />
-              <Metric label="Invested capital" value={formatMoney(portfolio.investedCapital)} />
               <Metric label="Net profit" value={formatMoney(portfolio.totalNetProfit)} accent />
               <Metric label="Active trades" value={String(portfolio.activeTrades)} />
               <Metric label="Overdue milestones" value={String(portfolio.overdueMilestones)} danger={portfolio.overdueMilestones > 0} />
@@ -118,8 +117,6 @@ export function PartnerDashboard() {
                       <TH>Client</TH>
                       <TH>Entity</TH>
                       <TH>Date</TH>
-                      <TH className="text-right">Frigo price</TH>
-                      <TH className="text-right">Sale price</TH>
                       <TH className="text-right">Net profit</TH>
                       <TH>Status</TH>
                     </TR>
@@ -131,8 +128,6 @@ export function PartnerDashboard() {
                         <TD>{t.client}</TD>
                         <TD>{t.entity}</TD>
                         <TD className="whitespace-nowrap text-ink-600">{fmtDate(t.contractDate)}</TD>
-                        <TD className="text-right font-mono tabular-nums">{formatMoney(t.frigoTotal)}</TD>
-                        <TD className="text-right font-mono tabular-nums">{formatMoney(t.saleTotal)}</TD>
                         <TD className="text-right font-mono tabular-nums font-semibold">{formatMoney(t.netProfit)}</TD>
                         <TD>
                           <span className={cn("inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium", PHASE_BADGE[toTradePhase(t.status)])}>
@@ -191,17 +186,9 @@ function PartnerTradeModal({ trade, onClose }: { trade: PartnerTrade | null; onC
         <div className="space-y-5">
           <div className="grid gap-6 sm:grid-cols-2">
             <Card>
-              <CardHeader title="Financial breakdown" />
+              <CardHeader title="Return" />
               <CardContent className="space-y-2 text-sm">
-                <Line label="Investment (Frigo)" value={formatMoney(trade.frigoTotal)} />
-                <Line label="Shipping" value={formatMoney(trade.shipping)} />
-                <Line label="Insurance" value={formatMoney(trade.insurance)} />
-                <Line label="Bank fees" value={formatMoney(trade.bankFees)} />
-                <Line label="Total costs" value={formatMoney(trade.totalCosts)} strong />
-                <Line label="Sale total" value={formatMoney(trade.saleTotal)} strong />
-                <div className="border-t border-border pt-2">
-                  <Line label="Net profit" value={formatMoney(trade.netProfit)} accent />
-                </div>
+                <Line label="Net profit" value={formatMoney(trade.netProfit)} accent />
               </CardContent>
             </Card>
             <Card>

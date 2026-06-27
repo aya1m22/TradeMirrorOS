@@ -1,0 +1,4 @@
+{
+  "//": "The Deno extension owns the Supabase Edge Functions (see .vscode/settings.json deno.enablePaths). Without it, VS Code's TypeScript server falsely flags Deno URL imports.",
+  "recommendations": ["denoland.vscode-deno"]
+}

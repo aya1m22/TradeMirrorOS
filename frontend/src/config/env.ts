@@ -58,19 +58,3 @@ export const env: AppEnv = readEnv();
 
 /** True when the app should read mock fixtures instead of Supabase. */
 export const isMockMode = env.useMocks;
-
-/**
- * Dev-only auto sign-in. When both VITE_DEV_AUTOLOGIN_* vars are set in a dev
- * build, the AuthProvider signs in with these real credentials on load so the
- * app has a genuine session/JWT (RLS still fully applies — this is not a
- * bypass). Never active in a production build. Leave the vars empty to disable.
- */
-export const devAutoLogin =
-  import.meta.env.DEV &&
-  import.meta.env.VITE_DEV_AUTOLOGIN_EMAIL &&
-  import.meta.env.VITE_DEV_AUTOLOGIN_PASSWORD
-    ? {
-        email: import.meta.env.VITE_DEV_AUTOLOGIN_EMAIL.trim(),
-        password: import.meta.env.VITE_DEV_AUTOLOGIN_PASSWORD,
-      }
-    : null;

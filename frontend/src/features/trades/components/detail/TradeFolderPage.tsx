@@ -9,6 +9,7 @@ import { formatMoney, formatQuantity } from "@/core/domain/finance";
 import { getTrade } from "@/features/trades/services/tradeListService";
 import { documentService } from "@/features/trades/services/documentService";
 import { tradeService } from "@/features/trades/services/tradeService";
+import { userService } from "@/features/users/services/userService";
 import { storageService } from "@/services/storage/storageService";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import type { DocumentType } from "@/services/supabase";
@@ -52,6 +53,13 @@ export function TradeFolderPage() {
     queryKey: ["trade-docs", id],
     queryFn: () => documentService.listByTrade(id),
     enabled: !!id,
+  });
+  // Partner roster for the assignment selector — SuperAdmin only (§3.4).
+  const partnersQ = useQuery({
+    queryKey: ["partner-users"],
+    queryFn: () => userService.list(),
+    enabled: canManage,
+    select: (users) => users.filter((u) => u.role === "partner" && u.is_active),
   });
 
   const [downloadError, setDownloadError] = useState("");
@@ -223,6 +231,38 @@ export function TradeFolderPage() {
               </Card>
             )}
           </div>
+
+          {canManage && (
+            <Card>
+              <CardHeader
+                title="Partner assignment"
+                description="Assign the investing partner who may see this trade in their portal (§13)."
+              />
+              <CardContent className="text-sm">
+                <div className="flex flex-wrap items-center gap-3">
+                  <Select
+                    label="Assigned partner"
+                    value={trade.partner_id ?? ""}
+                    disabled={busy || partnersQ.isLoading}
+                    onChange={(e) => mutateTrade({ partner_id: e.target.value || null })}
+                    className="max-w-[280px]"
+                  >
+                    <option value="">Unassigned</option>
+                    {(partnersQ.data ?? []).map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.full_name}
+                      </option>
+                    ))}
+                  </Select>
+                  {!partnersQ.isLoading && (partnersQ.data ?? []).length === 0 && (
+                    <p className="text-xs text-ink-500">
+                      No active partner users yet — invite one from Settings → Users.
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {canManage && (
             <Card>

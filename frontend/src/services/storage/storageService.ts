@@ -49,4 +49,13 @@ export const storageService = {
     if (error) throw error;
     return { path, fileName: file.name };
   },
+
+  /**
+   * Remove an uploaded object. Used to compensate (roll back) a partially-failed
+   * multi-step save so no orphaned file is left behind.
+   */
+  async remove(path: string): Promise<void> {
+    const { error } = await supabase.storage.from(TRADE_DOCUMENTS_BUCKET).remove([path]);
+    if (error) throw error;
+  },
 };

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Users, Plus, AlertCircle } from "lucide-react";
+import { Users, Plus, AlertCircle, Info } from "lucide-react";
 import { Button, Card, CardContent, Spinner, EmptyState, Select, Table, THead, TBody, TR, TH, TD } from "@/components/ui";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { userService } from "@/features/users/services/userService";
@@ -26,11 +26,15 @@ export function UsersPage() {
 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [actionError, setActionError] = useState("");
+  const [actionNotice, setActionNotice] = useState("");
+  const [inviteLink, setInviteLink] = useState("");
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["users"] });
 
   const guard = async (fn: () => Promise<unknown>, label: string) => {
     setActionError("");
+    setActionNotice("");
+    setInviteLink("");
     try {
       await fn();
       refresh();
@@ -55,6 +59,23 @@ export function UsersPage() {
       {actionError && (
         <div className="flex items-start gap-2 rounded-lg border border-danger/30 bg-danger/5 p-3 text-sm text-danger">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /> {actionError}
+        </div>
+      )}
+
+      {actionNotice && (
+        <div className="flex items-start gap-2 rounded-lg border border-brass-600/30 bg-brass-600/5 p-3 text-sm text-brass-700">
+          <Info className="mt-0.5 h-4 w-4 shrink-0" />
+          <div className="min-w-0 space-y-2">
+            <p>{actionNotice}</p>
+            {inviteLink && (
+              <div className="space-y-1">
+                <p className="text-xs font-medium uppercase tracking-wider text-brass-600">Invite link</p>
+                <code className="block w-full select-all break-all rounded border border-brass-600/20 bg-surface px-2 py-1.5 font-mono text-xs text-ink-700">
+                  {inviteLink}
+                </code>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -143,8 +164,13 @@ export function UsersPage() {
       <InviteUserModal
         open={inviteOpen}
         onClose={() => setInviteOpen(false)}
-        onInvited={() => {
+        onInvited={(result) => {
           setInviteOpen(false);
+          setActionError("");
+          // The account was created; an emailWarning means only delivery failed,
+          // in which case inviteLink lets the admin deliver it manually.
+          setActionNotice(result.emailWarning ?? "");
+          setInviteLink(result.inviteLink ?? "");
           void refresh();
         }}
       />

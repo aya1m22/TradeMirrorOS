@@ -9,5 +9,8 @@
     "build": "npm --prefix frontend run build",
     "typecheck": "npm --prefix frontend run typecheck",
     "test": "npm --prefix frontend run test"
+  },
+  "devDependencies": {
+    "supabase": "^2.108.0"
   }
 }

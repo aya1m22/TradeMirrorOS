@@ -2,13 +2,17 @@ import { FileText, Building2, Contact, ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui";
 import { ROUTES } from "@/config/routes";
+import { useAuth } from "@/features/auth/hooks/useAuth";
 
 /**
  * Landing surface for the internal workspace. In Phase 1 it orients the user
  * toward the core flow; live figures and the trade list arrive with the
- * trades module.
+ * trades module. Shortcuts are filtered by role so Internal users never see a
+ * link the router would then block (Contacts and New trade are SuperAdmin-only).
  */
 export function OverviewPage() {
+  const { role } = useAuth();
+  const isSuperAdmin = role === "super_admin";
   return (
     <div className="space-y-8">
       <header className="space-y-2">
@@ -36,30 +40,34 @@ export function OverviewPage() {
           title="Clients"
           body="Buyer records that populate the sales contract."
         />
-        <ShortcutCard
-          to={ROUTES.contacts}
-          icon={Contact}
-          title="Contacts"
-          body="Your team's details, shown to clients in place of the supplier's."
-        />
+        {isSuperAdmin && (
+          <ShortcutCard
+            to={ROUTES.contacts}
+            icon={Contact}
+            title="Contacts"
+            body="Your team's details, shown to clients in place of the supplier's."
+          />
+        )}
       </div>
 
-      <Card>
-        <CardContent className="flex items-center justify-between gap-4">
-          <div>
-            <h2 className="text-base font-semibold">Start a new trade</h2>
-            <p className="mt-0.5 text-sm text-ink-500">
-              The contract generation flow comes online in a later step.
-            </p>
-          </div>
-          <Link
-            to={ROUTES.tradeNew}
-            className="inline-flex h-10 items-center gap-2 rounded bg-brand-600 px-4 text-sm font-medium text-white transition-colors hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:ring-offset-2"
-          >
-            New trade <ArrowRight className="h-4 w-4" />
-          </Link>
-        </CardContent>
-      </Card>
+      {isSuperAdmin && (
+        <Card>
+          <CardContent className="flex items-center justify-between gap-4">
+            <div>
+              <h2 className="text-base font-semibold">Start a new trade</h2>
+              <p className="mt-0.5 text-sm text-ink-500">
+                Upload a supplier contract and generate the mirrored sales contract.
+              </p>
+            </div>
+            <Link
+              to={ROUTES.tradeNew}
+              className="inline-flex h-10 items-center gap-2 rounded bg-brand-600 px-4 text-sm font-medium text-white transition-colors hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:ring-offset-2"
+            >
+              New trade <ArrowRight className="h-4 w-4" />
+            </Link>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

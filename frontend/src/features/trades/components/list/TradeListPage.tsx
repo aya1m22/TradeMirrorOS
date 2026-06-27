@@ -7,6 +7,7 @@ import { cn } from "@/lib/cn";
 import { ROUTES, tradeDetailPath } from "@/config/routes";
 import { formatQuantity } from "@/core/domain/finance";
 import { listTrades, type TradeListItem } from "@/features/trades/services/tradeListService";
+import { useAuth } from "@/features/auth/hooks/useAuth";
 import {
   TRADE_PHASES,
   toTradePhase,
@@ -24,6 +25,8 @@ function formatDate(iso: string): string {
 
 export function TradeListPage() {
   const navigate = useNavigate();
+  const { role } = useAuth();
+  const canCreate = role === "super_admin"; // /trades/new is SuperAdmin-only (§3.4).
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["trades"],
     queryFn: listTrades,
@@ -51,9 +54,11 @@ export function TradeListPage() {
           <h1 className="text-2xl font-semibold">Trades</h1>
           <p className="text-ink-500">Every saved sales contract and its documents.</p>
         </div>
-        <Button onClick={() => navigate(ROUTES.tradeNew)}>
-          <Plus className="h-4 w-4" /> New trade
-        </Button>
+        {canCreate && (
+          <Button onClick={() => navigate(ROUTES.tradeNew)}>
+            <Plus className="h-4 w-4" /> New trade
+          </Button>
+        )}
       </header>
 
       {/* Search + status filters */}
@@ -105,9 +110,11 @@ export function TradeListPage() {
               : "Saved sales contracts will appear here. Start by creating one."
           }
           action={
-            <Button onClick={() => navigate(ROUTES.tradeNew)}>
-              <Plus className="h-4 w-4" /> New trade
-            </Button>
+            canCreate ? (
+              <Button onClick={() => navigate(ROUTES.tradeNew)}>
+                <Plus className="h-4 w-4" /> New trade
+              </Button>
+            ) : undefined
           }
         />
       )}

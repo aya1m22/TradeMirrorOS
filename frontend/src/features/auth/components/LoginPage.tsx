@@ -17,7 +17,7 @@ export function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  // Already signed in (e.g. dev auto-login) → bounce to the app.
+  // Already signed in (returning visitor with a valid session) → into the app.
   if (status === "authenticated") return <Navigate to={ROUTES.overview} replace />;
 
   const submit = async (e: React.FormEvent) => {

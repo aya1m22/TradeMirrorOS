@@ -6,9 +6,8 @@ import type { UserRole } from "@/services/supabase";
 
 /**
  * Gate for authenticated routes (PRD §2). While the session resolves we show a
- * spinner; with no session we redirect to /login. In dev, the hardcoded
- * auto-login establishes a session up-front, so this never blocks the Phase-1
- * flow during development.
+ * spinner; with no session we redirect to /login. There is no auto-login in any
+ * environment — the app always starts at /login until a real session exists.
  */
 export function RequireAuth() {
   const { status } = useAuth();

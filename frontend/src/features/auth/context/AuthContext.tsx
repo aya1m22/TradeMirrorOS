@@ -9,16 +9,15 @@ import {
 } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { authService } from "../services/authService";
-import { devAutoLogin } from "@/config/env";
 import type { AppUser, AuthContextValue, AuthStatus } from "../types";
 
 export const AuthContext = createContext<AuthContextValue | null>(null);
 
 /**
  * Tracks the Supabase session and resolves the signed-in user's profile row
- * (which carries the role). Establishes the auth state on mount and keeps it
- * in sync via `onAuthStateChange`. Login screens and route guards consume this
- * in later steps; for now it simply resolves to `unauthenticated`.
+ * (which carries the role). Establishes the auth state on mount from the
+ * persisted Supabase session only — no auto-login — and keeps it in sync via
+ * `onAuthStateChange`. With no session the app renders the Login page.
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>("loading");
@@ -49,18 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     authService
       .getSession()
-      .then(async (existing) => {
-        let session = existing;
-        // Dev-only: establish a real session automatically when configured.
-        if (!session && devAutoLogin) {
-          try {
-            session = await authService.signIn(devAutoLogin.email, devAutoLogin.password);
-          } catch (e) {
-            console.warn("[auth] dev auto-login failed:", e instanceof Error ? e.message : e);
-          }
-        }
-        await applySession(session);
-      })
+      .then((existing) => applySession(existing))
       .catch(() => {
         if (mounted.current) setStatus("unauthenticated");
       });
@@ -81,10 +69,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [applySession]);
 
   const signOut = useCallback(async () => {
-    await authService.signOut();
-    setSession(null);
-    setUser(null);
-    setStatus("unauthenticated");
+    try {
+      await authService.signOut();
+    } catch (e) {
+      // Even if the network sign-out fails, clear the local session so the user
+      // is reliably logged out — never leave a stale/half-authenticated state.
+      console.error("[auth] Sign-out request failed; clearing local session anyway.", e);
+    } finally {
+      setSession(null);
+      setUser(null);
+      setStatus("unauthenticated");
+    }
   }, []);
 
   const value = useMemo<AuthContextValue>(
