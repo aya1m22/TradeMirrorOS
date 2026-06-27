@@ -1,0 +1,19 @@
+{
+  "name": "trademirror-backend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "TradeMirror OS backend — Supabase schema, migrations, seed, storage policies, RLS, and admin scripts. Dependencies resolve from the shared repo-root node_modules.",
+  "scripts": {
+    "dev": "node scripts/check-migrations.mjs",
+    "check:migrations": "node scripts/check-migrations.mjs",
+    "check:supabase": "node scripts/check-supabase.mjs",
+    "seed:users": "node scripts/seed-auth-users.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.4"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.3"
+  }
+}

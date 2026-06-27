@@ -1,0 +1,54 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Design tokens ──────────────────────────────────────────────
+   Surface layering: sunken background -> surface -> elevated.
+   Values are warm/green-tinted to sit with the Pine + Brass palette.
+------------------------------------------------------------------ */
+:root {
+  --bg: #f4f5f2; /* app background (cool paper) */
+  --surface: #ffffff; /* base card surface */
+  --surface-2: #fafbf9; /* subtly raised / striped rows */
+  --border: #e3e6e1; /* hairline ledger rules */
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-bg font-sans text-ink-800;
+    line-height: 1.6;
+  }
+
+  /* Display headings: tight tracking, the technical Grotesk voice */
+  h1,
+  h2,
+  h3 {
+    @apply font-display text-ink-900;
+    letter-spacing: -0.02em;
+  }
+
+  /* Tabular, ledger-aligned numerals for trade data */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Honor reduced-motion globally */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+    }
+  }
+}

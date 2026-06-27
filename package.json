@@ -1,0 +1,13 @@
+{
+  "name": "trademirror-os",
+  "private": true,
+  "version": "0.1.0",
+  "description": "TradeMirror OS monorepo — frontend (Vite React app) + backend (Supabase DB layer). Dependencies are installed once at the repo root and resolved by both workspaces.",
+  "scripts": {
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev:backend": "npm --prefix backend run dev",
+    "build": "npm --prefix frontend run build",
+    "typecheck": "npm --prefix frontend run typecheck",
+    "test": "npm --prefix frontend run test"
+  }
+}
