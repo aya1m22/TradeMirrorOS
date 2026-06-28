@@ -12,12 +12,32 @@ export interface AppEnv {
   useMocks: boolean;
 }
 
-/** Accepts a full URL or a bare Supabase project ref and returns a full URL. */
+/**
+ * Accepts a full URL or a bare Supabase project ref and returns the canonical
+ * project ORIGIN (scheme + host[:port]) — no path, query, or trailing slash.
+ *
+ * Stripping the path is essential: supabase-js appends `/auth/v1`, `/rest/v1`,
+ * `/storage/v1`, etc. to this value. A stray path suffix such as
+ * `…supabase.co/rest/v1` would nest the auth call under
+ * `/rest/v1/auth/v1/token`, which PostgREST rejects with
+ * "Invalid path specified in request URL" (PGRST125) — the production login
+ * failure this guards against. Reducing to the origin makes the value robust to
+ * a misconfigured VITE_SUPABASE_URL (e.g. someone pasting the REST endpoint).
+ */
 export function normalizeSupabaseUrl(raw: string): string {
-  const value = raw.trim().replace(/\/+$/, "");
+  const value = raw.trim();
   if (!value) return value;
-  if (/^https?:\/\//i.test(value)) return value;
-  return `https://${value}.supabase.co`;
+  // Bare project ref (no scheme) → full URL; drop any accidental path segment.
+  if (!/^https?:\/\//i.test(value)) {
+    const ref = value.replace(/\/.*$/, "");
+    return ref ? `https://${ref}.supabase.co` : "";
+  }
+  // Full URL → keep only the origin, dropping any path/query/hash.
+  try {
+    return new URL(value).origin;
+  } catch {
+    return value.replace(/\/+$/, "");
+  }
 }
 
 function parseBool(raw: string | undefined, fallback: boolean): boolean {
