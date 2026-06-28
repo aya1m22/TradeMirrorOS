@@ -28,8 +28,19 @@ export function UsersPage() {
   const [actionError, setActionError] = useState("");
   const [actionNotice, setActionNotice] = useState("");
   const [inviteLink, setInviteLink] = useState("");
+  const [copied, setCopied] = useState(false);
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["users"] });
+
+  const copyInviteLink = async () => {
+    try {
+      await navigator.clipboard.writeText(inviteLink);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard blocked (e.g. insecure context) — the link is still select-all.
+    }
+  };
 
   const guard = async (fn: () => Promise<unknown>, label: string) => {
     setActionError("");
@@ -70,9 +81,15 @@ export function UsersPage() {
             {inviteLink && (
               <div className="space-y-1">
                 <p className="text-xs font-medium uppercase tracking-wider text-brass-600">Invite link</p>
-                <code className="block w-full select-all break-all rounded border border-brass-600/20 bg-surface px-2 py-1.5 font-mono text-xs text-ink-700">
-                  {inviteLink}
-                </code>
+                <div className="flex items-start gap-2">
+                  <code className="block min-w-0 flex-1 select-all break-all rounded border border-brass-600/20 bg-surface px-2 py-1.5 font-mono text-xs text-ink-700">
+                    {inviteLink}
+                  </code>
+                  <Button variant="outline" size="sm" onClick={copyInviteLink}>
+                    {copied ? "Copied" : "Copy"}
+                  </Button>
+                </div>
+                <p className="text-xs text-ink-500">Share this link with the user to set their password.</p>
               </div>
             )}
           </div>
@@ -167,9 +184,16 @@ export function UsersPage() {
         onInvited={(result) => {
           setInviteOpen(false);
           setActionError("");
-          // The account was created; an emailWarning means only delivery failed,
-          // in which case inviteLink lets the admin deliver it manually.
-          setActionNotice(result.emailWarning ?? "");
+          setCopied(false);
+          // The account is the source of truth for success — always confirm it.
+          // An emailWarning means only delivery failed; inviteLink then lets the
+          // admin deliver the invitation manually.
+          const created = result.userCreated ? "User account created." : "";
+          setActionNotice(
+            result.emailWarning
+              ? `${created} ${result.emailWarning}`.trim()
+              : `${created} An invitation email was sent.`.trim(),
+          );
           setInviteLink(result.inviteLink ?? "");
           void refresh();
         }}
