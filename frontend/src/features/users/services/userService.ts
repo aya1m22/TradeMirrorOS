@@ -66,11 +66,24 @@ export const userService = {
 
   /** Invite a new user (delegates to the privileged Edge Function). */
   async invite(input: { full_name: string; email: string; role: UserRole }): Promise<InviteResult> {
+    // Attach the caller's access token explicitly. supabase-js `functions.invoke`
+    // can otherwise fall back to the anon key, which invite-user rejects with
+    // "Invalid session" (it authorizes the caller as a Super Admin). getSession()
+    // returns a fresh token, refreshing it first if it had expired.
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) {
+      throw new Error("Your session has expired. Please sign in again and retry.");
+    }
     const { data, error } = await supabase.functions.invoke<{
       emailSent?: boolean;
       emailWarning?: string | null;
       inviteLink?: string | null;
-    }>("invite-user", { body: input });
+    }>("invite-user", {
+      body: input,
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    });
     if (error) {
       if (isFunctionNetworkError(error)) {
         throw new Error(
