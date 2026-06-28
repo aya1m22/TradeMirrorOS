@@ -15,6 +15,8 @@ export const ROUTES = {
   partner: "/partner",
   login: "/login",
   forgotPassword: "/forgot-password",
+  acceptInvite: "/accept-invite",
+  resetPassword: "/reset-password",
 } as const;
 
 export type RoutePath = (typeof ROUTES)[keyof typeof ROUTES];

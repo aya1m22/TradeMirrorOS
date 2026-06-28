@@ -25,7 +25,13 @@ const SUPABASE_SHIM = `
   create role service_role;
 
   create schema if not exists auth;
-  create table auth.users (id uuid primary key default gen_random_uuid());
+  -- Mirror the columns of Supabase's auth.users that our migrations reference
+  -- (id for FKs, email for the invite/reset account lookup). Real auth.users has
+  -- many more, but these are all the authored SQL touches.
+  create table auth.users (
+    id uuid primary key default gen_random_uuid(),
+    email text
+  );
   create or replace function auth.uid() returns uuid
     language sql stable as $$ select null::uuid $$;
 

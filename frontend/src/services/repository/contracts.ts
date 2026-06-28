@@ -58,7 +58,6 @@ export interface AuthRepository {
   getSession(): Promise<Session | null>;
   /** The authenticated user's profile row (carries the role). */
   getProfile(userId: string): Promise<UserRow | null>;
-  resetPassword(email: string): Promise<void>;
   /** Subscribe to auth changes; returns an unsubscribe function. */
   onAuthStateChange(callback: (session: Session | null) => void): () => void;
 }

@@ -12,6 +12,8 @@ import { TaxReadinessPage } from "@/features/exports/components/TaxReadinessPage
 import { PartnerDashboard } from "@/features/partner/components/PartnerDashboard";
 import { LoginPage } from "@/features/auth/components/LoginPage";
 import { ForgotPasswordPage } from "@/features/auth/components/ForgotPasswordPage";
+import { AcceptInvitePage } from "@/features/auth/components/AcceptInvitePage";
+import { ResetPasswordPage } from "@/features/auth/components/ResetPasswordPage";
 import { RequireAuth, RequireRole } from "@/features/auth/components/ProtectedRoute";
 import { ROUTES } from "@/config/routes";
 
@@ -28,6 +30,8 @@ export function AppRouter() {
       {/* Public */}
       <Route path={ROUTES.login} element={<LoginPage />} />
       <Route path={ROUTES.forgotPassword} element={<ForgotPasswordPage />} />
+      <Route path={ROUTES.acceptInvite} element={<AcceptInvitePage />} />
+      <Route path={ROUTES.resetPassword} element={<ResetPasswordPage />} />
 
       <Route element={<RequireAuth />}>
         {/* Partner-only dashboard (no main navigation) */}

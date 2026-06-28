@@ -1,48 +1,57 @@
-import { supabase, unwrap, unwrapList, type UserRow, type UserRole } from "@/services/supabase";
+import {
+  supabase,
+  unwrap,
+  unwrapList,
+  type Database,
+  type UserRow,
+  type UserRole,
+} from "@/services/supabase";
+import { parseFunctionError, isFunctionNetworkError } from "@/services/supabase/functionError";
 
-/** Outcome of an invite. The account may be created even when the email warns. */
+/** A row of the Super-Admin-only pending-invitations view. */
+export type PendingInvitation = Database["public"]["Views"]["v_pending_invitations"]["Row"];
+
+/** Outcome of sending an invitation. */
 export interface InviteResult {
-  /** True once the account exists (the source of truth for success). */
-  userCreated: boolean;
-  /** Non-null when the account was created but the invite email didn't go out. */
+  /** True when the invite email was delivered via Brevo. */
+  emailSent: boolean;
+  /** Set when the invitation was saved but the email didn't go out. */
   emailWarning: string | null;
-  /** The invite link, returned for manual delivery when no email was sent. */
+  /** The accept-invite link, returned for manual delivery when no email was sent. */
   inviteLink: string | null;
-}
-
-/**
- * supabase-js wraps a non-2xx Edge Function response in a FunctionsHttpError
- * whose `context` is the raw Response — the default `error.message` is just the
- * opaque "Edge Function returned a non-2xx status code". The function returns its
- * real reason as JSON `{ error }`, so read that and surface it instead.
- */
-async function readEdgeFunctionError(error: unknown): Promise<string | null> {
-  const ctx = (error as { context?: unknown }).context;
-  if (ctx instanceof Response) {
-    try {
-      const data = await ctx.clone().json();
-      if (data && typeof data.error === "string") return data.error;
-    } catch {
-      // Response wasn't JSON — fall back to the generic message.
-    }
-  }
-  return null;
 }
 
 /**
  * User management (PRD §2.4) — SuperAdmin only (enforced by RLS on `users`).
  *
- * Reads and role/status updates run client-side under RLS. Inviting a new user
- * creates a Supabase Auth account + sends an invite email, which requires the
- * service-role key and Resend — that privileged work lives in the `invite-user`
- * Edge Function (see backend/supabase/functions/invite-user). The browser only
- * invokes it; no secrets are shipped to the client.
+ * Reads and role/status updates run client-side under RLS. Inviting creates a
+ * secure invitation record and emails the link — privileged work that needs the
+ * service-role key, so it lives in the `invite-user` Edge Function. The browser
+ * only invokes it; no secrets are shipped to the client. The account itself is
+ * created later, when the invitee accepts and sets a password.
  */
 export const userService = {
   async list(): Promise<UserRow[]> {
     return unwrapList(
       await supabase.from("users").select("*").order("full_name", { ascending: true }),
     );
+  },
+
+  /** Unaccepted invitations awaiting the invitee (most recent first). */
+  async pendingInvitations(): Promise<PendingInvitation[]> {
+    const res = await supabase
+      .from("v_pending_invitations")
+      .select("*")
+      .order("created_at", { ascending: false });
+    // The view ships in migration 20260628130000. Until it's applied to an
+    // environment, degrade to an empty list rather than erroring the Users page.
+    if (
+      res.error &&
+      (res.error.code === "PGRST205" || /v_pending_invitations/.test(res.error.message ?? ""))
+    ) {
+      return [];
+    }
+    return unwrapList(res);
   },
 
   async updateRole(id: string, role: UserRole): Promise<UserRow> {
@@ -58,16 +67,21 @@ export const userService = {
   /** Invite a new user (delegates to the privileged Edge Function). */
   async invite(input: { full_name: string; email: string; role: UserRole }): Promise<InviteResult> {
     const { data, error } = await supabase.functions.invoke<{
-      userCreated?: boolean;
+      emailSent?: boolean;
       emailWarning?: string | null;
       inviteLink?: string | null;
     }>("invite-user", { body: input });
     if (error) {
-      const detail = await readEdgeFunctionError(error);
-      throw new Error(detail ?? error.message);
+      if (isFunctionNetworkError(error)) {
+        throw new Error(
+          "Couldn't reach the invite-user Edge Function. Confirm it's deployed and reachable.",
+        );
+      }
+      const { message } = await parseFunctionError(error);
+      throw new Error(message ?? error.message);
     }
     return {
-      userCreated: data?.userCreated ?? true,
+      emailSent: data?.emailSent ?? false,
       emailWarning: data?.emailWarning ?? null,
       inviteLink: data?.inviteLink ?? null,
     };

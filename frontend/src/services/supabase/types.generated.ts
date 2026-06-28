@@ -385,6 +385,89 @@ export interface Database {
           },
         ];
       };
+      // Invitation token store (migration 20260628130000). RLS-locked: the
+      // browser never reads/writes these directly — only the Edge Functions
+      // (service role) do. Typed here so the schema mirror stays complete.
+      invitations: {
+        Row: {
+          id: string;
+          email: string;
+          full_name: string;
+          role: UserRole;
+          token_hash: string;
+          expires_at: string;
+          accepted_at: string | null;
+          invited_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          email: string;
+          full_name: string;
+          role: UserRole;
+          token_hash: string;
+          expires_at: string;
+          accepted_at?: string | null;
+          invited_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          email?: string;
+          full_name?: string;
+          role?: UserRole;
+          token_hash?: string;
+          expires_at?: string;
+          accepted_at?: string | null;
+          invited_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "invitations_invited_by_fkey";
+            columns: ["invited_by"];
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      password_resets: {
+        Row: {
+          id: string;
+          user_id: string;
+          token_hash: string;
+          expires_at: string;
+          used_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          token_hash: string;
+          expires_at: string;
+          used_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          token_hash?: string;
+          expires_at?: string;
+          used_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "password_resets_user_id_fkey";
+            columns: ["user_id"];
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: {
       // Role-masked, row-scoped read model over `trades` (see migration
@@ -423,6 +506,21 @@ export interface Database {
           updated_at: string;
           client_company_name: string | null;
           entity_name: string | null;
+        };
+        Relationships: [];
+      };
+      // Super-Admin-only list of unaccepted invitations for the Users page
+      // (migration 20260628130000). Excludes token_hash by design.
+      v_pending_invitations: {
+        Row: {
+          id: string;
+          email: string;
+          full_name: string;
+          role: UserRole;
+          expires_at: string;
+          created_at: string;
+          is_expired: boolean;
+          invited_by: string | null;
         };
         Relationships: [];
       };

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Users, Plus, AlertCircle, Info } from "lucide-react";
+import { Users, Plus, AlertCircle, Info, MailCheck } from "lucide-react";
 import { Button, Card, CardContent, Spinner, EmptyState, Select, Table, THead, TBody, TR, TH, TD } from "@/components/ui";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { userService } from "@/features/users/services/userService";
@@ -13,6 +13,12 @@ const ROLES: { value: UserRole; label: string }[] = [
   { value: "partner", label: "Partner" },
 ];
 
+const ROLE_LABEL: Record<UserRole, string> = {
+  super_admin: "Super Admin",
+  internal: "Internal Team",
+  partner: "Partner",
+};
+
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
   const d = new Date(iso);
@@ -23,6 +29,10 @@ export function UsersPage() {
   const { user: me } = useAuth();
   const queryClient = useQueryClient();
   const { data, isLoading, isError, error } = useQuery({ queryKey: ["users"], queryFn: () => userService.list() });
+  const pending = useQuery({
+    queryKey: ["pending-invitations"],
+    queryFn: () => userService.pendingInvitations(),
+  });
 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [actionError, setActionError] = useState("");
@@ -30,7 +40,10 @@ export function UsersPage() {
   const [inviteLink, setInviteLink] = useState("");
   const [copied, setCopied] = useState(false);
 
-  const refresh = () => queryClient.invalidateQueries({ queryKey: ["users"] });
+  const refresh = () => {
+    void queryClient.invalidateQueries({ queryKey: ["users"] });
+    void queryClient.invalidateQueries({ queryKey: ["pending-invitations"] });
+  };
 
   const copyInviteLink = async () => {
     try {
@@ -178,6 +191,47 @@ export function UsersPage() {
         </Card>
       )}
 
+      {(pending.data ?? []).length > 0 && (
+        <section className="space-y-3">
+          <div className="flex items-center gap-2">
+            <MailCheck className="h-4 w-4 text-brass-600" />
+            <h2 className="text-sm font-medium text-ink-700">Pending invitations</h2>
+            <span className="text-xs text-ink-400">({(pending.data ?? []).length})</span>
+          </div>
+          <Card className="overflow-hidden p-0">
+            <Table>
+              <THead>
+                <TR>
+                  <TH>Email</TH>
+                  <TH>Name</TH>
+                  <TH>Role</TH>
+                  <TH>Invited</TH>
+                  <TH>Status</TH>
+                </TR>
+              </THead>
+              <TBody>
+                {(pending.data ?? []).map((inv) => (
+                  <TR key={inv.id}>
+                    <TD className="font-medium text-ink-900">{inv.email}</TD>
+                    <TD className="text-ink-600">{inv.full_name}</TD>
+                    <TD className="text-ink-600">{ROLE_LABEL[inv.role]}</TD>
+                    <TD className="whitespace-nowrap text-ink-600">{formatDate(inv.created_at)}</TD>
+                    <TD>
+                      <span className={inv.is_expired ? "text-danger" : "text-brass-700"}>
+                        {inv.is_expired ? "Expired" : "Awaiting acceptance"}
+                      </span>
+                    </TD>
+                  </TR>
+                ))}
+              </TBody>
+            </Table>
+          </Card>
+          <p className="text-xs text-ink-500">
+            Re-invite the same email to send a fresh link.
+          </p>
+        </section>
+      )}
+
       <InviteUserModal
         open={inviteOpen}
         onClose={() => setInviteOpen(false)}
@@ -185,15 +239,9 @@ export function UsersPage() {
           setInviteOpen(false);
           setActionError("");
           setCopied(false);
-          // The account is the source of truth for success — always confirm it.
-          // An emailWarning means only delivery failed; inviteLink then lets the
-          // admin deliver the invitation manually.
-          const created = result.userCreated ? "User account created." : "";
-          setActionNotice(
-            result.emailWarning
-              ? `${created} ${result.emailWarning}`.trim()
-              : `${created} An invitation email was sent.`.trim(),
-          );
+          // An emailWarning means the invitation was saved but delivery failed;
+          // inviteLink then lets the admin deliver it manually.
+          setActionNotice(result.emailWarning ?? "Invitation email sent.");
           setInviteLink(result.inviteLink ?? "");
           void refresh();
         }}

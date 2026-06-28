@@ -33,11 +33,6 @@ export const authService: AuthRepository = {
     );
   },
 
-  async resetPassword(email: string): Promise<void> {
-    const { error } = await supabase.auth.resetPasswordForEmail(email);
-    if (error) throw error;
-  },
-
   onAuthStateChange(callback: (session: Session | null) => void): () => void {
     const {
       data: { subscription },

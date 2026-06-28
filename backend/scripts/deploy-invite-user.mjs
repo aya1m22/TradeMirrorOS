@@ -1,8 +1,7 @@
-// Deploy the `invite-user` Edge Function and push its secrets (PRD §2.2/§2.4).
+// Deploy the TradeMirror Edge Functions and push their Brevo secrets.
 //
-// Fixes the runtime error: "The Edge Function 'invite-user' is not deployed".
-// The function exists in source (backend/supabase/functions/invite-user) but has
-// to be deployed to the live Supabase project before the app can invoke it.
+// Deploys: invite-user, accept-invitation, request-password-reset,
+//          reset-password, milestone-alerts.
 //
 // Prereq — authenticate the Supabase CLI ONCE (this part is yours, it needs a
 // browser / personal access token):
@@ -12,10 +11,12 @@
 //
 // Then run:   node backend/scripts/deploy-invite-user.mjs
 //
-// It: (1) deploys the function to the project ref in frontend/.env, and
-//     (2) pushes RESEND_API_KEY (+ alert secrets) from backend/.env so the
-//         branded Resend invite email works. Without RESEND_API_KEY the function
-//         still works, falling back to Supabase Auth's built-in invite mailer.
+// It: (1) pushes BREVO_* (+ APP_URL, ALERT_TO_EMAIL) from backend/.env so the
+//         branded Brevo emails work, and
+//     (2) deploys every function. The three public functions
+//         (accept-invitation, request-password-reset, reset-password) are
+//         deployed with --no-verify-jwt because they're token-authenticated and
+//         called by signed-out users; the others keep JWT verification.
 
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
@@ -25,6 +26,15 @@ import { fileURLToPath } from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, "..", "..");
 const backendDir = resolve(repoRoot, "backend");
+
+// Functions to deploy, with whether the JWT gateway check should be skipped.
+const FUNCTIONS = [
+  { name: "invite-user", noVerifyJwt: false },
+  { name: "accept-invitation", noVerifyJwt: true },
+  { name: "request-password-reset", noVerifyJwt: true },
+  { name: "reset-password", noVerifyJwt: true },
+  { name: "milestone-alerts", noVerifyJwt: false },
+];
 
 // Resolve the bundled Supabase CLI binary (installed as a dev dependency).
 function resolveSupabaseBin() {
@@ -71,7 +81,6 @@ function projectRef() {
 
 const SB = resolveSupabaseBin();
 const REF = projectRef();
-const PLACEHOLDER = "your_resend_api_key_here";
 
 function run(args, opts = {}) {
   console.log(`\n$ supabase ${args.join(" ")}`);
@@ -88,23 +97,27 @@ if (!process.env.SUPABASE_ACCESS_TOKEN) {
   console.log("If the deploy fails with an auth error, run `npx supabase login` first.\n");
 }
 
-console.log(`Deploying invite-user to project ${REF} ...`);
+console.log(`Deploying TradeMirror Edge Functions to project ${REF} ...`);
 
-// 1) Push secrets from backend/.env so the Resend invite email works.
+// 1) Push secrets from backend/.env so the Brevo emails work.
 const env = readEnv(resolve(backendDir, ".env"));
 const secretArgs = [];
-for (const key of ["RESEND_API_KEY", "INVITE_FROM_EMAIL", "ALERT_FROM_EMAIL", "ALERT_TO_EMAIL", "APP_URL"]) {
+for (const key of ["BREVO_API_KEY", "BREVO_SENDER_EMAIL", "BREVO_SENDER_NAME", "APP_URL", "ALERT_TO_EMAIL"]) {
   const v = env[key];
-  if (v && v !== PLACEHOLDER) secretArgs.push(`${key}=${v}`);
+  if (v) secretArgs.push(`${key}=${v}`);
 }
 if (secretArgs.length) {
   run(["secrets", "set", ...secretArgs, "--project-ref", REF]);
 } else {
   console.log("No deployable secrets found in backend/.env — skipping secrets push.");
-  console.log("(invite-user will fall back to Supabase Auth's built-in invite mailer.)");
+  console.log("(Emails will be skipped until BREVO_API_KEY + BREVO_SENDER_EMAIL are set.)");
 }
 
-// 2) Deploy the function.
-run(["functions", "deploy", "invite-user", "--project-ref", REF]);
+// 2) Deploy each function.
+for (const fn of FUNCTIONS) {
+  const args = ["functions", "deploy", fn.name, "--project-ref", REF];
+  if (fn.noVerifyJwt) args.push("--no-verify-jwt");
+  run(args);
+}
 
-console.log("\n✅ invite-user deployed. Try sending an invite again from the app.");
+console.log("\n✅ Functions deployed. Try sending an invite or a password reset from the app.");

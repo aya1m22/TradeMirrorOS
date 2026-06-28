@@ -4,22 +4,20 @@
 //   - Advance overdue: advance_status != 'received' and signing_date + 7d < today
 //   - Balance overdue: balance_status != 'received' and bol_date + 7d < today
 // Flips the milestone (+ trade) to 'overdue', and emails the SuperAdmin via
-// Resend. Fires once at T+7 then daily until marked received.
+// Brevo. Fires once at T+7 then daily until marked received.
 //
 // ── Secrets (set via `supabase secrets set ...`) ────────────────────────────
 //   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY   - auto-injected in the Edge runtime
-//   RESEND_API_KEY                            - TODO(secret): Resend API key
-//   ALERT_FROM_EMAIL                          - e.g. alerts@chipafarm.com (verified domain)
-//   ALERT_TO_EMAIL                            - TODO(secret): SuperAdmin recipient
+//   BREVO_API_KEY, BREVO_SENDER_EMAIL         - transactional email (shared)
+//   ALERT_TO_EMAIL                            - SuperAdmin recipient
 //
 // ── Scheduling ──────────────────────────────────────────────────────────────
 //   Deploy:   supabase functions deploy milestone-alerts
 //   Schedule: create a daily cron (Supabase Dashboard → Edge Functions → Schedules,
 //             or pg_cron calling the function URL). Example cron: "0 8 * * *".
-//
-// NOTE: Deno Edge runtime; intentionally outside the frontend TS project.
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getAdminClient } from "../_shared/supabaseAdmin.ts";
+import { isBrevoConfigured, sendBrevoEmail, escapeHtml } from "../_shared/brevo.ts";
 
 // deno-lint-ignore no-explicit-any
 declare const Deno: any;
@@ -32,17 +30,14 @@ function daysSince(iso: string | null): number | null {
 }
 
 Deno.serve(async () => {
-  const url = Deno.env.get("SUPABASE_URL");
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  const resendKeyRaw = Deno.env.get("RESEND_API_KEY");
-  const resendKey = resendKeyRaw && resendKeyRaw !== "your_resend_api_key_here" ? resendKeyRaw : null;
-  const from = Deno.env.get("ALERT_FROM_EMAIL") ?? "alerts@chipafarm.com";
-  const to = Deno.env.get("ALERT_TO_EMAIL"); // SuperAdmin recipient
+  const to = Deno.env.get("ALERT_TO_EMAIL")?.trim(); // SuperAdmin recipient
 
-  if (!url || !serviceKey) {
-    return json({ error: "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY." }, 500);
+  let admin;
+  try {
+    admin = getAdminClient();
+  } catch (e) {
+    return json({ error: e instanceof Error ? e.message : "Server not configured." }, 500);
   }
-  const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
 
   // Pull trades that could be overdue (not both milestones received).
   const { data: trades, error } = await admin
@@ -69,35 +64,31 @@ Deno.serve(async () => {
     }
   }
 
-  // Email each alert to the SuperAdmin via Resend (PRD §11.3). A failure on one
+  // Email each alert to the SuperAdmin via Brevo (PRD §11.3). A failure on one
   // email never aborts the others (or the function) — collect and report them.
   let emailed = 0;
   const emailErrors: string[] = [];
-  const emailSkipped = !resendKey || !to;
+  const emailSkipped = !isBrevoConfigured() || !to;
   if (!emailSkipped) {
     for (const a of alerts) {
+      const line = `${a.kind} payment is ${a.daysOverdue} day(s) past the ${DAYS}-day deadline.`;
       try {
-        const res = await fetch("https://api.resend.com/emails", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            from,
-            to,
-            subject: `TradeMirror Alert: ${a.client} — ${a.kind} Overdue`,
-            text:
-              `Trade ${a.ref} — ${a.client}\n${a.kind} payment is ${a.daysOverdue} day(s) past the ${DAYS}-day deadline.\n` +
-              `Open the trade folder to review.`,
-          }),
+        await sendBrevoEmail(to!, "TradeMirror Admin", {
+          subject: `TradeMirror Alert: ${a.client} — ${a.kind} Overdue`,
+          text: `Trade ${a.ref} — ${a.client}\n${line}\nOpen the trade folder to review.`,
+          html:
+            `<p style="font-family:Inter,Arial,sans-serif;font-size:14px;color:#1b211e;">` +
+            `<strong>Trade ${escapeHtml(a.ref)}</strong> — ${escapeHtml(a.client)}<br>${escapeHtml(line)}<br>` +
+            `Open the trade folder to review.</p>`,
         });
-        if (res.ok) emailed++;
-        else emailErrors.push(`${a.ref}: HTTP ${res.status} ${await res.text()}`);
+        emailed++;
       } catch (e) {
-        emailErrors.push(`${a.ref}: ${e instanceof Error ? e.message : "network error"}`);
+        emailErrors.push(`${a.ref}: ${e instanceof Error ? e.message : "send error"}`);
       }
     }
   }
-  // When RESEND_API_KEY / ALERT_TO_EMAIL are unset, alerts are still flipped to
-  // "overdue" (surfaced in-app); emails resume once the secrets are set.
+  // When Brevo / ALERT_TO_EMAIL are unset, alerts are still flipped to "overdue"
+  // (surfaced in-app); emails resume once the secrets are set.
 
   return json({ ok: true, overdue: alerts.length, emailed, emailSkipped, emailErrors }, 200);
 });

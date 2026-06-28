@@ -10,9 +10,9 @@ const ROLES: { value: UserRole; label: string }[] = [
 ];
 
 /**
- * Invite a new user (PRD §2.2/§2.4). Sends to the `invite-user` Edge Function
- * which creates the auth account and emails the invitation via Resend. Until the
- * function's secrets are configured the call errors — surfaced inline.
+ * Invite a new user (PRD §2.2/§2.4). Sends to the `invite-user` Edge Function,
+ * which saves a secure invitation record and emails the accept link via Brevo.
+ * The account is created later, when the invitee accepts and sets a password.
  */
 export function InviteUserModal({
   open,
@@ -55,15 +55,8 @@ export function InviteUserModal({
       });
       onInvited(result);
     } catch (e) {
-      let msg: string;
-      if (e instanceof Error && e.message.includes("Failed to send a request to the Edge Function")) {
-        // Network/CORS or the function isn't reachable (not deployed).
-        msg = "Couldn't reach the invite-user Edge Function. Confirm it's deployed and reachable.";
-      } else {
-        // Real reason surfaced from the function's JSON body by userService.
-        msg = `Couldn't send the invite: ${e instanceof Error ? e.message : "Unknown error."}`;
-      }
-      setError(msg);
+      // userService already maps network + function errors to a clear message.
+      setError(e instanceof Error ? e.message : "Couldn't send the invite. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -74,7 +67,7 @@ export function InviteUserModal({
       open={open}
       onClose={onClose}
       title="Invite user"
-      description="Creates an account and emails an invitation to set a password."
+      description="Emails a secure link to set a password. The account is created when they accept."
       footer={
         <>
           <Button variant="outline" onClick={onClose} disabled={saving}>
