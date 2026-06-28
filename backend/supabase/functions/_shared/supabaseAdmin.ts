@@ -1,6 +1,11 @@
 // Shared service-role Supabase client + app-URL resolution for the Edge runtime.
-
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+//
+// Import is a fully-qualified URL (not the bare "@supabase/supabase-js"
+// specifier): the Supabase CLI bundler does not apply the functions/deno.json
+// import map to files under _shared, so a bare specifier fails to bundle with
+// 'Relative import path … not prefixed with / or ./ or ../'. A URL always
+// resolves on the Deno Edge runtime.
+import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // deno-lint-ignore no-explicit-any
 declare const Deno: any;
